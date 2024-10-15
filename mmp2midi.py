@@ -4,6 +4,7 @@
 a standalone utility to convert mmp or mmpz files to midi files
 (basically used to tinker with the mmp format)
 authors: Mohamed Abdel Maksoud (mohamed at amaksoud.com), Alexis Archambault
+maintainers: UmbratheUmbreon/BlueVapor1234
 licence: GPL2
 """
 
