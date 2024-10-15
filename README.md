@@ -1,5 +1,7 @@
 Utility that converts LMMS files to Midi files.
 
+Example project and exported midi can be found in the repository.
+
 Requirements
 ---------------
 Python 3.12+ with xml and midiutil packages installed.
@@ -12,6 +14,12 @@ Usage
 1. Open command prompt and navigate to the folder where mmp2midi.py is located.
 2. Type `python mmp2midi.py ` and then include the path to the project file.
 3. Open the folder with the project file and find your output midi file.
+
+Known Issues
+---------------
+- Automation interpolation is not supported, and will only sound correct when using constant mode in LMMS automation.
+- Drum patches besides patch 0 are not supported.
+- FX channel volume does not factor into channel volume.
 
 Acknowledgements
 ---------------
