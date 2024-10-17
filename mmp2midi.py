@@ -15,21 +15,30 @@ import xml.etree.ElementTree as etree
 from midiutil.MidiFile import MIDIFile
 import decimal
 
+# File constants
 MMP_EXT = "mmp"
 MMPZ_EXT = "mmpz"
 MID_EXT = "mid"
 DATA_LENGTH_OFFSET = 4
-DIV = 48
-MAX_VEL = 127
+
+# Normalization constants
+TME_DIV = 48
+VOL_MULT = 2 # normalizes volume to be as loud as it is in LMMS
 PAN_DIV = 1.5625
 PAN_OFF = 64
 PTC_DIV1 = 0.732421875 # normalizes -6000 to 6000 range of automation to -8192 to 8192 range of pitch wheel
 PTC_DIV2 = 0.03333333333333333333333333333333 # normalizes -60 to 60 half step range of automation to -2 to 2 half step range of pitch wheel
 NOT_OFF = 12 # fixes weird off by one octave issue
+
+# Controller channel constants
 PAN_CHNL = 10
 VOL_CHNL = 7
 BNK_CHNL = 0
 
+# Misc. constants
+MAX_VEL = 127
+DEF_VOL = 100
+DEF_PAN = 0
 
 def parse_command_line():
     success = True
@@ -62,8 +71,10 @@ def parse_command_line():
 
 
 def usage():
-    print("mm2midi - converts mmp or mmpz file to midi file")
-    print("Usage: mm2midi.py inputfile ")
+    print("Description:")
+    print(" Converts .mmp/.mmpz LMMS project files to .mid Midi files")
+    print("Type arguments as follows:")
+    print(" mmp2midi.py projectpath")
     exit(0)
 
 
@@ -135,17 +146,27 @@ def collect_tracks(root):
     """ Collects sensible tracks """
     tracks = []
     autotracks = []
+    mixers = []
+
+    # tracks
     for t in root.findall('song//track'):
-        #print("testing track ", t.attrib)
+        # print("testing track ", t.attrib)
         if t.find('instrumenttrack') is not None and \
             t.find('pattern/note') is not None:
             tracks.append(t)
         elif t.find('automationpattern') is not None:
             autotracks.append(t)
-    return tracks, autotracks
+
+    # mixers
+    for t in root.findall('song//fxchannel'):
+        # print("testing track ", t.attrib)
+        if t.find('fxchain') is not None:
+            mixers.append(t)
+    
+    return tracks, autotracks, mixers
 
 
-def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks):
+def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
     midif = MIDIFile(len(tracks), True, False, True)
     channel = 0
     print("%d tracks" %(len(tracks)))
@@ -155,6 +176,17 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks):
             continue
         track_name = track.attrib["name"]
         tmp_channel = channel
+
+        volmult = 1
+        fxch = int(track.find('instrumenttrack').attrib['fxch'])
+        # TODO: figure out mixer sending
+        # TODO: add support for delay effect
+        if len(mixers) > fxch and fxch != 0:
+            if 'volume' in mixers[fxch].attrib:
+                volmult = float(mixers[fxch].attrib['volume']) # multiply in mixer volume if not master and if exists
+        volmult *= float(mixers[0].attrib['volume']) # always includes master volume
+        volmult *= VOL_MULT # normalization
+        
         isdrums = track.find('instrumenttrack/instrument').attrib['name'] == 'sf2player' and int(track.find('instrumenttrack/instrument/sf2player').attrib["bank"]) == 128
         if isdrums:
             channel = 9
@@ -170,16 +202,16 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks):
             midif.addProgramChange(thistrack, channel, 0, track.find('instrumenttrack/instrument/sf2player').attrib["patch"])
         else:
             midif.addProgramChange(thistrack, channel, 0, 0) # this is where instruments are set
-        # TODO: add fx channel volume into this
-        midif.addControllerEvent(thistrack, channel, 0, VOL_CHNL, int(float(track.find('instrumenttrack').get('vol', 64)) / PAN_DIV))
-        midif.addControllerEvent(thistrack, channel, 0, PAN_CHNL, int((float(track.find('instrumenttrack').get('pan', 0)) / PAN_DIV) + PAN_OFF))
+
+        midif.addControllerEvent(thistrack, channel, 0, VOL_CHNL, normalize_vol(float(track.find('instrumenttrack').get('vol', DEF_VOL)) * volmult))
+        midif.addControllerEvent(thistrack, channel, 0, PAN_CHNL, normalize_pan(float(track.find('instrumenttrack').get('pan', DEF_PAN))))
         for p in track.iter('pattern'):
-            tstart = float(p.attrib['pos'])/DIV
+            tstart = float(p.attrib['pos'])/TME_DIV
             for note in p.findall('note'):
                 attr = dict([(k, float(v)) for (k,v) in note.attrib.items()])
                 key = int(attr['key'] + NOT_OFF)
-                dur = attr['len']/DIV
-                time = tstart + attr['pos']/DIV
+                dur = attr['len']/TME_DIV
+                time = tstart + attr['pos']/TME_DIV
                 vol = attr['vol']
                 if dur <= 0 or vol <= 0 or time < 0: continue
                 #print(">> adding note key %d @ %0.2f for %0.2f" %(key, time, dur))
@@ -191,33 +223,35 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks):
                 
         # automation tracks here
         # to convert automation panning to midi panning, divide by PAN_DIV, then add PAN_OFF
+
+        # TODO: use automation track indicator tags with ID matching instead of names for automation
         for autotrack in autotracks:
             if not track_name in autotrack.find('automationpattern').attrib['name']:
                 continue
             for p in autotrack.iter('automationpattern'):
-                tstart = float(p.attrib['pos'])/DIV
+                tstart = float(p.attrib['pos'])/TME_DIV
                 times = iter(p.findall('time'))
                 for time in times:
                     attr = dict([(k, float(v)) for (k,v) in time.attrib.items()])
-                    time = tstart + attr['pos']/DIV
+                    time = tstart + attr['pos']/TME_DIV
                     value = attr['value']
                     # TODO: fix pitch automation
                     if 'Panning' in p.attrib['name']:
-                        midif.addControllerEvent(thistrack, channel, time, PAN_CHNL, int((value / PAN_DIV) + PAN_OFF))
+                        midif.addControllerEvent(thistrack, channel, time, PAN_CHNL, normalize_pan(value))
                     elif 'Pitch' in p.attrib['name']:
                         # i hate you.
                         # why cant you just iterate normally
                         # if int(p.attrib['prog']) == 1 or int(p.attrib['prog']) == 2:
                         #     try:
                         #         print("Interpolating automation at ", time, " with value ", value)
-                        #         interpolate_automation(thistrack, channel, time, value, tstart + float(next(times).attrib['pos'])/DIV, float(next(times).attrib['value']), 'Pitch', midif)
+                        #         interpolate_automation(thistrack, channel, time, value, tstart + float(next(times).attrib['pos'])/TME_DIV, float(next(times).attrib['value']), 'Pitch', midif)
                         #     except Exception as e:
                         #         print(f"Error interpolating {p.attrib['name']}: {e}")
                         #         midif.addPitchWheelEvent(thistrack, channel, time, normalize_pitch(value))
                         # else:
                             midif.addPitchWheelEvent(thistrack, channel, time, normalize_pitch(value))
                     elif 'Volume' in p.attrib['name']:
-                        midif.addControllerEvent(thistrack, channel, time, VOL_CHNL, int(value / PAN_DIV))
+                        midif.addControllerEvent(thistrack, channel, time, VOL_CHNL, normalize_vol(value))
                     
 
         thistrack += 1
@@ -237,10 +271,10 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks):
         if not "Tempo" in autotrack.find('automationpattern').attrib['name']:
             continue
         for p in autotrack.iter('automationpattern'):
-            tstart = float(p.attrib['pos'])/DIV
+            tstart = float(p.attrib['pos'])/TME_DIV
             for time in p.findall('time'):
                 attr = dict([(k, float(v)) for (k,v) in time.attrib.items()])
-                time = tstart + attr['pos']/DIV
+                time = tstart + attr['pos']/TME_DIV
                 value = attr['value']
                 midif.addTempo(thistrack, time, float(value))
             
@@ -308,6 +342,6 @@ if __name__ == '__main__':
     root = read_xml_tree(file_data)
     if root is not None:
         timesig_num, timesig_den, bpm = read_header(root)
-        tracks, autotracks = collect_tracks(root)
-        midif = build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks)
+        tracks, autotracks, mixers = collect_tracks(root)
+        midif = build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers)
         save_midi_file(midif, input_file_path, is_mmp_file)

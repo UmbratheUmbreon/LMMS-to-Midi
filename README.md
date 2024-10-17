@@ -19,7 +19,11 @@ Known Issues
 ---------------
 - Automation interpolation is not supported, and will only sound correct when using constant mode in LMMS automation.
 - Drum patches besides patch 0 are not supported.
-- FX channel volume does not factor into channel volume.
+- FX channel sending is not supported.
+- Effects are not supported.
+- Beat/Bassline tracks are not supported.
+- Sample tracks are not supported.
+- Tracks of types besides Soundfont Player are not supported.
 
 Acknowledgements
 ---------------
