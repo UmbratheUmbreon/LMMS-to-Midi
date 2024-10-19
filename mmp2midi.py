@@ -168,6 +168,12 @@ def collect_tracks(root):
 
 def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
     midif = MIDIFile(len(tracks), True, False, True)
+
+    # 48 ticks per beat, beats are in bpm, so to convert to ticks per second you take ((bpm / 60) * 48)
+    # ticks per second can be converted into a seconds amount by taking the inversion (1/tps) which gives you seconds per tick which, is just seconds
+    # this seconds amount can then be used to calculate delay effect, by dividing the delay seconds by it and rounding which gives a defined tick delay
+    spt = 1 / (bpm / 60 * 48)
+
     channel = 0
     print("%d tracks" %(len(tracks)))
     thistrack = 0
@@ -177,16 +183,25 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
         track_name = track.attrib["name"]
         tmp_channel = channel
 
+        channelDelay = 0
         volmult = 1
         fxch = int(track.find('instrumenttrack').attrib['fxch'])
         # TODO: figure out mixer sending
-        # TODO: add support for delay effect
-        if len(mixers) > fxch and fxch != 0:
-            if 'volume' in mixers[fxch].attrib:
+        if len(mixers) > fxch:
+            if fxch != 0 and 'volume' in mixers[fxch].attrib:
                 volmult = float(mixers[fxch].attrib['volume']) # multiply in mixer volume if not master and if exists
+            if mixers[fxch].find('fxchain') is not None:
+                fxchain = mixers[fxch].find('fxchain')
+                if 'numofeffects' in fxchain.attrib and 'enabled' in fxchain.attrib:
+                    if int(fxchain.attrib['enabled']) == 1 and int(fxchain.attrib['numofeffects']) > 0:
+                        for effect in fxchain.findall('effect'):
+                            if effect.find('Delay') is not None:
+                                channelDelay += float(effect.find('Delay').attrib['DelayTimeSamples'])
+
         volmult *= float(mixers[0].attrib['volume']) # always includes master volume
         volmult *= VOL_MULT # normalization
-        
+        channelDelay = int(channelDelay / spt) # normalize delay to ticks
+
         isdrums = track.find('instrumenttrack/instrument').attrib['name'] == 'sf2player' and int(track.find('instrumenttrack/instrument/sf2player').attrib["bank"]) == 128
         if isdrums:
             channel = 9
@@ -211,7 +226,7 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
                 attr = dict([(k, float(v)) for (k,v) in note.attrib.items()])
                 key = int(attr['key'] + NOT_OFF)
                 dur = attr['len']/TME_DIV
-                time = tstart + attr['pos']/TME_DIV
+                time = tstart + ((attr['pos'] + channelDelay)/TME_DIV)
                 vol = attr['vol']
                 if dur <= 0 or vol <= 0 or time < 0: continue
                 #print(">> adding note key %d @ %0.2f for %0.2f" %(key, time, dur))
