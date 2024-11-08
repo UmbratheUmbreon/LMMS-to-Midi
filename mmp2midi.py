@@ -198,7 +198,9 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
                             if effect.find('Delay') is not None:
                                 channelDelay += float(effect.find('Delay').attrib['DelayTimeSamples'])
 
-        volmult *= float(mixers[0].attrib['volume']) # always includes master volume
+        if 'volume' in mixers[0].attrib:
+            volmult *= float(mixers[0].attrib['volume']) # always includes master volume
+            
         volmult *= VOL_MULT # normalization
         channelDelay = int(channelDelay / spt) # normalize delay to ticks
 
