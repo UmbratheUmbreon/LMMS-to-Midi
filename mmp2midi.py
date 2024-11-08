@@ -200,7 +200,7 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
 
         if 'volume' in mixers[0].attrib:
             volmult *= float(mixers[0].attrib['volume']) # always includes master volume
-            
+
         volmult *= VOL_MULT # normalization
         channelDelay = int(channelDelay / spt) # normalize delay to ticks
 
@@ -220,7 +220,7 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
         else:
             midif.addProgramChange(thistrack, channel, 0, 0) # this is where instruments are set
 
-        midif.addControllerEvent(thistrack, channel, 0, VOL_CHNL, max(min(normalize_vol(float(track.find('instrumenttrack').get('vol', DEF_VOL)) * volmult), 127), 0))
+        midif.addControllerEvent(thistrack, channel, 0, VOL_CHNL, normalize_vol(float(track.find('instrumenttrack').get('vol', DEF_VOL)) * volmult))
         midif.addControllerEvent(thistrack, channel, 0, PAN_CHNL, normalize_pan(float(track.find('instrumenttrack').get('pan', DEF_PAN))))
         for p in track.iter('pattern'):
             tstart = float(p.attrib['pos'])/TME_DIV
@@ -330,10 +330,10 @@ def normalize_pitch(value):
     return max(-8192, min(8192, int((value / PTC_DIV1) / PTC_DIV2)))
 
 def normalize_pan(value):
-    return int((value / PAN_DIV) + PAN_OFF)
+    return max(min(int((value / PAN_DIV) + PAN_OFF), 127), 0)
 
 def normalize_vol(value):
-    return int(value / PAN_DIV)
+    return max(min(int(value / PAN_DIV), 127), 0)
 
 def drange(x, y, jump):
   while x < y:
