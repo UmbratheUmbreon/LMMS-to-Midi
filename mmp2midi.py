@@ -31,12 +31,14 @@ PTC_DIV2 = 0.03333333333333333333333333333333 # normalizes -60 to 60 half step r
 NOT_OFF = 12 # fixes weird off by one octave issue
 
 # Controller channel constants
-PAN_CHNL = 10
-VOL_CHNL = 7
-BNK_CHNL = 0
+PAN_CHNL = 10 # channel defined as "Coarse Panning", i.e. the panning left right or center
+VOL_CHNL = 7 # channel defnied as "Coarse Volume", i.e. the overall volume
+BNK_CHNL = 0 # channel defined as "Coarse Bank", i.e. the current soundfont bank
+EXPR_CHNL = 11 # channel defined as "Coarse Expression", i.e. volume percentage of master
 
 # Misc. constants
 MAX_VEL = 127
+MIN_VEL = 0
 DEF_VOL = 100
 DEF_PAN = 0
 
@@ -242,6 +244,7 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
         # to convert automation panning to midi panning, divide by PAN_DIV, then add PAN_OFF
 
         # TODO: use automation track indicator tags with ID matching instead of names for automation
+        # TODO: use expression commmands for volume control over master volume control, though this could potentially be adverse as it would not allow increasing volume over the master.
         for autotrack in autotracks:
             if not track_name in autotrack.find('automationpattern').attrib['name']:
                 continue
@@ -330,10 +333,10 @@ def normalize_pitch(value):
     return max(-8192, min(8192, int((value / PTC_DIV1) / PTC_DIV2)))
 
 def normalize_pan(value):
-    return max(min(int((value / PAN_DIV) + PAN_OFF), 127), 0)
+    return max(min(int((value / PAN_DIV) + PAN_OFF), MAX_VEL), MIN_VEL)
 
 def normalize_vol(value):
-    return max(min(int(value / PAN_DIV), 127), 0)
+    return max(min(int(value / PAN_DIV), MAX_VEL), MIN_VEL)
 
 def drange(x, y, jump):
   while x < y:
