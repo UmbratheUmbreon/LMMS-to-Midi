@@ -206,19 +206,32 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
         volmult *= VOL_MULT # normalization
         channelDelay = int(channelDelay / spt) # normalize delay to ticks
 
-        isdrums = track.find('instrumenttrack/instrument').attrib['name'] == 'sf2player' and int(track.find('instrumenttrack/instrument/sf2player').attrib["bank"]) == 128
+        issf2 = track.find('instrumenttrack/instrument').attrib['name'] == 'sf2player'
+        hasbank = issf2 and 'bank' in track.find('instrumenttrack/instrument/sf2player').attrib
+        haspatch = issf2 and 'patch' in track.find('instrumenttrack/instrument/sf2player').attrib
+
+        isdrums = issf2 and hasbank and int(track.find('instrumenttrack/instrument/sf2player').attrib["bank"]) == 128
         if isdrums:
             channel = 9
-        if track.find('instrumenttrack/instrument').attrib['name'] == 'sf2player':
-            print("adding track", track_name, "on bank", track.find('instrumenttrack/instrument/sf2player').attrib["bank"], ", patch", track.find('instrumenttrack/instrument/sf2player').attrib["patch"], ", channel", channel)
+        if issf2:
+            if hasbank:
+                print("adding track", track_name, "on bank", track.find('instrumenttrack/instrument/sf2player').attrib["bank"], ", patch", track.find('instrumenttrack/instrument/sf2player').attrib["patch"], ", channel", channel)
+            elif haspatch:
+                print("adding track", track_name, "on bank 0, patch", track.find('instrumenttrack/instrument/sf2player').attrib["patch"], ", channel", channel)
+            else:
+                print("adding track", track_name, "on bank 0, patch 0, channel", channel)
         else:
             print("adding track", track_name, "on channel", channel)
         midif.addTrackName(thistrack, 0, track_name)
         # midif.addTimeSignature(thistrack, 0, timesig_num, timesig_den, timesig_den, 8)
         midif.addTempo(thistrack, 0, bpm)
-        if track.find('instrumenttrack/instrument').attrib['name'] == 'sf2player':
-            midif.addControllerEvent(thistrack, channel, 0, BNK_CHNL, int(track.find('instrumenttrack/instrument/sf2player').attrib["bank"]))
-            midif.addProgramChange(thistrack, channel, 0, track.find('instrumenttrack/instrument/sf2player').attrib["patch"])
+        if issf2:
+            if hasbank:
+                midif.addControllerEvent(thistrack, channel, 0, BNK_CHNL, int(track.find('instrumenttrack/instrument/sf2player').attrib["bank"]))
+            if haspatch:
+                midif.addProgramChange(thistrack, channel, 0, track.find('instrumenttrack/instrument/sf2player').attrib["patch"])
+            else:
+                midif.addProgramChange(thistrack, channel, 0, 0)
         else:
             midif.addProgramChange(thistrack, channel, 0, 0) # this is where instruments are set
 
@@ -256,6 +269,7 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
                     time = tstart + attr['pos']/TME_DIV
                     value = attr['value']
                     # TODO: fix pitch automation
+                    # TODO: add patch/bank automation
                     if 'Panning' in p.attrib['name']:
                         midif.addControllerEvent(thistrack, channel, time, PAN_CHNL, normalize_pan(value))
                     elif 'Pitch' in p.attrib['name']:
