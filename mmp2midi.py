@@ -42,7 +42,6 @@ MAX_VEL = 127
 MIN_VEL = 0
 DEF_VOL = 100
 DEF_PAN = 0
-DEN_CPT = [96, 48, 24, 12, 6, 3, 1.5, 0.75, 0.375] # defines the clocks per tick for each power of two denominator, the power is used as the index for this array, though this array only goes to 256th notes as LMMS maxes out at 196th notes
 
 def parse_command_line():
     success = True
@@ -224,11 +223,9 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
                 print("adding track", track_name, "on bank 0, patch 0, channel", channel)
         else:
             print("adding track", track_name, "on channel", channel)
+        
         midif.addTrackName(thistrack, 0, track_name)
-
-        denominatorIndex = int(math.log(timesig_den, 2))
-        midif.addTimeSignature(thistrack, 0, timesig_num, denominatorIndex, max(int(DEN_CPT[denominatorIndex]), 1), 8) # cpt will desync for any note more precice than 32nd notes
-
+        midif.addTimeSignature(thistrack, 0, timesig_num, int(math.log(timesig_den, 2)), max(min(int(96 / timesig_den), 255), 0), 8) # cpt will desync for any note more precice than 32nd notes
         midif.addTempo(thistrack, 0, bpm)
 
         if issf2:
