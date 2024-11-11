@@ -14,6 +14,7 @@ import zlib
 import xml.etree.ElementTree as etree
 from midiutil.MidiFile import MIDIFile
 import decimal
+import math
 
 # File constants
 MMP_EXT = "mmp"
@@ -41,6 +42,7 @@ MAX_VEL = 127
 MIN_VEL = 0
 DEF_VOL = 100
 DEF_PAN = 0
+DEN_CPT = [96, 48, 24, 12, 6, 3, 1.5, 0.75, 0.375] # defines the clocks per tick for each power of two denominator, the power is used as the index for this array, though this array only goes to 256th notes as LMMS maxes out at 196th notes
 
 def parse_command_line():
     success = True
@@ -123,16 +125,16 @@ def read_xml_tree(file_data):
     
 def read_header(root):
     head = root.find('.//head').attrib
-        
-    # MidiFile does not seem to handle time signature.
-    # How unfortunate...
+    
+    # Default values for LMMS project
     timesig_num = 4
     timesig_den = 4
     if "timesig_numerator" in head:
         timesig_num = int(head["timesig_numerator"])
         timesig_den= int(head["timesig_denominator"])
 
-    bpm = 120.0
+    # Default values for LMMS project
+    bpm = 140.0
     if "bpm" in head:
         bpm = float(head['bpm'])
     else:
@@ -223,8 +225,12 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
         else:
             print("adding track", track_name, "on channel", channel)
         midif.addTrackName(thistrack, 0, track_name)
-        # midif.addTimeSignature(thistrack, 0, timesig_num, timesig_den, timesig_den, 8)
+
+        denominatorIndex = int(math.log(timesig_den, 2))
+        midif.addTimeSignature(thistrack, 0, timesig_num, denominatorIndex, max(int(DEN_CPT[denominatorIndex]), 1), 8) # cpt will desync for any note more precice than 32nd notes
+
         midif.addTempo(thistrack, 0, bpm)
+
         if issf2:
             if hasbank:
                 midif.addControllerEvent(thistrack, channel, 0, BNK_CHNL, int(track.find('instrumenttrack/instrument/sf2player').attrib["bank"]))
@@ -370,6 +376,7 @@ def save_midi_file(midif, input_file_path, is_mmp_file):
     print("MIDI file written to %s"%foutname)
 
 
+# TODO: add support for going through and converting every project file in a folder to midi, instead of manually doing each
 if __name__ == '__main__':
     input_file_path = parse_command_line()
     is_mmp_file, file_data = read_input_file(input_file_path)

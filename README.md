@@ -24,6 +24,7 @@ Known Issues
 - Beat/Bassline tracks are not supported.
 - Sample tracks are not supported.
 - Tracks of types besides Soundfont Player are not supported.
+- Time signatures with denominators with denominators that are not powers of 2 are not supported.
 
 Acknowledgements
 ---------------
