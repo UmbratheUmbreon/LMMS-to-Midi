@@ -15,6 +15,7 @@ import xml.etree.ElementTree as etree
 from midiutil.MidiFile import MIDIFile
 import decimal
 import math
+import collections
 
 # File constants
 MMP_EXT = "mmp"
@@ -304,17 +305,35 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
             channel = 0
 
     # BPM changes and shiz
+    timesigchangesnum = {}
+    timesigchangesden = {}
     for autotrack in autotracks:
-        if not "Tempo" in autotrack.find('automationpattern').attrib['name']:
-            continue
         for p in autotrack.iter('automationpattern'):
             tstart = float(p.attrib['pos'])/TME_DIV
-            for time in p.findall('time'):
+            times = iter(p.findall('time'))
+            for time in times:
                 attr = dict([(k, float(v)) for (k,v) in time.attrib.items()])
                 time = tstart + attr['pos']/TME_DIV
                 value = attr['value']
-                midif.addTempo(thistrack, time, float(value))
-            
+                if "Tempo" in autotrack.find('automationpattern').attrib['name']:
+                    midif.addTempo(thistrack, time, float(value))
+                elif "Numerator" in autotrack.find('automationpattern').attrib['name']:
+                    if time != 0:
+                        timesigchangesnum[time] = int(value)
+                elif "Denominator" in autotrack.find('automationpattern').attrib['name']:
+                    if time != 0:
+                        timesigchangesden[time] = int(value)
+    
+    # print(timesigchangesnum)
+    # print(timesigchangesden)
+
+    # numerators take priority, however the issue will arise that if there are more denominator changes than numerator, they will be omitted, however this is uncommon so this solution is acceptable for now
+    for time in timesigchangesnum:
+        timesig_num = timesigchangesnum[time]
+        if time in timesigchangesden:
+            timesig_den = timesigchangesden[time]
+        midif.addTimeSignature(thistrack, time, timesig_num, int(math.log(timesig_den, 2)), max(min(int(96 / timesig_den), 255), 0), 8)
+
     return midif
 
 def interpolate_automation(thistrack, channel, initialtime, initialvalue, nexttime, nextvalue, type, midif):
