@@ -233,7 +233,7 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
             if hasbank:
                 midif.addControllerEvent(thistrack, channel, 0, BNK_CHNL, int(track.find('instrumenttrack/instrument/sf2player').attrib["bank"]))
             if haspatch:
-                midif.addProgramChange(thistrack, channel, 0, track.find('instrumenttrack/instrument/sf2player').attrib["patch"])
+                midif.addProgramChange(thistrack, channel, 0, int(track.find('instrumenttrack/instrument/sf2player').attrib["patch"]))
             else:
                 midif.addProgramChange(thistrack, channel, 0, 0)
         else:
@@ -248,7 +248,7 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
                 key = int(attr['key'] + NOT_OFF)
                 dur = attr['len']/TME_DIV
                 time = tstart + ((attr['pos'] + channelDelay)/TME_DIV)
-                vol = attr['vol']
+                vol = int(attr['vol'])
                 if dur <= 0 or vol <= 0 or time < 0: continue
                 #print(">> adding note key %d @ %0.2f for %0.2f" %(key, time, dur))
                 assert(0 <= key <= MAX_VEL)

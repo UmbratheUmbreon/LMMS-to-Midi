@@ -5,7 +5,6 @@ Example project and exported midi can be found in the repository.
 Requirements
 ---------------
 - Python 3.12+ with xml and midiutil packages installed.
-- Modified MidiFile.py script included in repository.
 - mmp2midi.py script included in repository.
 - .mmpz or .mmp LMMS project file.
 
