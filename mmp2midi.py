@@ -8,6 +8,7 @@ maintainers: UmbratheUmbreon/BlueVapor1234
 licence: GPL2
 """
 
+import os
 import sys
 import getopt
 import zlib
@@ -228,6 +229,7 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
         midif.addTrackName(thistrack, 0, track_name)
         midif.addTimeSignature(thistrack, 0, timesig_num, int(math.log(timesig_den, 2)), max(min(int(96 / timesig_den), 255), 0), 8) # cpt will desync for any note more precice than 32nd notes
         midif.addTempo(thistrack, 0, bpm)
+        # In the future I could implement key signatures, copyright, and text, however LMMS projects have no such analogue (?)
 
         if issf2:
             if hasbank:
@@ -248,12 +250,9 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
                 key = int(attr['key'] + NOT_OFF)
                 dur = attr['len']/TME_DIV
                 time = tstart + ((attr['pos'] + channelDelay)/TME_DIV)
-                vol = int(attr['vol'])
+                vol = normalize_vol(attr['vol'])
                 if dur <= 0 or vol <= 0 or time < 0: continue
                 #print(">> adding note key %d @ %0.2f for %0.2f" %(key, time, dur))
-                assert(0 <= key <= MAX_VEL)
-                assert(dur > 0)
-                vol = min(vol, MAX_VEL)
                 midif.addNote(track=thistrack, channel=channel,
                     pitch=key, time=time , duration=dur, volume=vol)
                 
@@ -263,7 +262,7 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
         # TODO: use automation track indicator tags with ID matching instead of names for automation
         # TODO: use expression commmands for volume control over master volume control, though this could potentially be adverse as it would not allow increasing volume over the master.
         for autotrack in autotracks:
-            if not track_name in autotrack.find('automationpattern').attrib['name']:
+            if not track_name + ">" in autotrack.find('automationpattern').attrib['name']:
                 continue
             for p in autotrack.iter('automationpattern'):
                 tstart = float(p.attrib['pos'])/TME_DIV
@@ -391,10 +390,7 @@ def save_midi_file(midif, input_file_path, is_mmp_file):
         midif.writeFile(f)
     print("MIDI file written to %s"%foutname)
 
-
-# TODO: add support for going through and converting every project file in a folder to midi, instead of manually doing each
-if __name__ == '__main__':
-    input_file_path = parse_command_line()
+def process_file(input_file_path):
     is_mmp_file, file_data = read_input_file(input_file_path)
     root = read_xml_tree(file_data)
     if root is not None:
@@ -402,3 +398,15 @@ if __name__ == '__main__':
         tracks, autotracks, mixers = collect_tracks(root)
         midif = build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers)
         save_midi_file(midif, input_file_path, is_mmp_file)
+
+# TODO: add support for going through and converting every project file in a folder to midi, instead of manually doing each
+if __name__ == '__main__':
+    input_file_path = parse_command_line()
+    if '.' in input_file_path:
+        process_file(input_file_path)
+    else:
+        for root, dirs, files in os.walk(input_file_path):
+            for file in files:
+                if file.endswith(MMP_EXT) or file.endswith(MMPZ_EXT):
+                    print("Attempting to convert %s"%file)
+                    process_file(os.path.join(root, file))
