@@ -399,7 +399,6 @@ def process_file(input_file_path):
         midif = build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers)
         save_midi_file(midif, input_file_path, is_mmp_file)
 
-# TODO: add support for going through and converting every project file in a folder to midi, instead of manually doing each
 if __name__ == '__main__':
     input_file_path = parse_command_line()
     if '.' in input_file_path:
