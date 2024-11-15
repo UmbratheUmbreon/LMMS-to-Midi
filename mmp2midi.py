@@ -217,10 +217,12 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
         if isdrums:
             channel = 9
         if issf2:
-            if hasbank:
+            if hasbank and haspatch:
                 print("adding track", track_name, "on bank", track.find('instrumenttrack/instrument/sf2player').attrib["bank"], ", patch", track.find('instrumenttrack/instrument/sf2player').attrib["patch"], ", channel", channel)
             elif haspatch:
                 print("adding track", track_name, "on bank 0, patch", track.find('instrumenttrack/instrument/sf2player').attrib["patch"], ", channel", channel)
+            elif hasbank:
+                print("adding track", track_name, "on bank", track.find('instrumenttrack/instrument/sf2player').attrib["bank"], ", patch 0, channel", channel)
             else:
                 print("adding track", track_name, "on bank 0, patch 0, channel", channel)
         else:
@@ -314,12 +316,12 @@ def build_midi_file(timesig_num, timesig_den, bpm, tracks, autotracks, mixers):
                 attr = dict([(k, float(v)) for (k,v) in time.attrib.items()])
                 time = tstart + attr['pos']/TME_DIV
                 value = attr['value']
-                if "Tempo" in autotrack.find('automationpattern').attrib['name']:
+                if "Tempo" in p.attrib['name']:
                     midif.addTempo(thistrack, time, float(value))
-                elif "Numerator" in autotrack.find('automationpattern').attrib['name']:
+                elif "Numerator" in p.attrib['name']:
                     if time != 0:
                         timesigchangesnum[time] = int(value)
-                elif "Denominator" in autotrack.find('automationpattern').attrib['name']:
+                elif "Denominator" in p.attrib['name']:
                     if time != 0:
                         timesigchangesden[time] = int(value)
     

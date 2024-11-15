@@ -25,6 +25,7 @@ Known Issues
 - Time signatures with denominators that are not powers of 2 are not supported.
 - Time signature automation will ignore denominator only changes.
 - Automation events occuring at the same time will have what would be percieved in the LMMS editor as a "previous" event overriding the "next" event.
+- Automation tracks targetting a track with the same name as another will result in both tracks recieving the automation events.
 
 Acknowledgements
 ---------------
